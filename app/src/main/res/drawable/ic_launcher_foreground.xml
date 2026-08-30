@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Adaptive Icon Safe Zone: 66x66 dp centered at (54,54) -> Range [21, 87] -->
+
+    <!-- Stylized, slanted 'E' representing 'Easy' and 'Energy' -->
+    <!-- The middle bar has a sharp arrow-like tip representing 'Seamless' and 'Growth' -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,30 H75 V38 H46 L43,50 H65 L72,54 L65,58 H41 L38,70 H75 V78 H30 L42,30 Z" />
+</vector>

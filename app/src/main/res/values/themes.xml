@@ -1,0 +1,4 @@
+<resources>
+
+    <style name="Theme.EasyMoney" parent="Theme.MaterialComponents.Light" />
+</resources>
