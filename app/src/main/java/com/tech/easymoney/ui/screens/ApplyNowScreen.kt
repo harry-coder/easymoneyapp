@@ -1,10 +1,16 @@
 package com.tech.easymoney.ui.screens
 
 import android.Manifest
+import android.net.Uri
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -12,12 +18,11 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -314,6 +319,17 @@ fun LoanDetailsStep(viewModel: ApplyViewModel) {
 @Composable
 fun KycStep(viewModel: ApplyViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+
+    val panLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) {
+        viewModel.updatePanUri(it)
+    }
+    val bankLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) {
+        viewModel.updateBankStatementUri(it)
+    }
+    val salaryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { viewModel.addSalarySlip(it) }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -340,12 +356,84 @@ fun KycStep(viewModel: ApplyViewModel) {
             leadingIcon = { Icon(Icons.Rounded.Fingerprint, null) }
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            "Note: Document uploads (Selfie, Pay Slips, Bank Statements) are currently disabled for maintenance.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.outline
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        Text("Upload Documents", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+
+        DocumentPicker(
+            label = "PAN Card (Image)",
+            icon = Icons.Rounded.Badge,
+            selectedUri = uiState.panUri,
+            onPick = { panLauncher.launch("image/*") }
         )
+
+        DocumentPicker(
+            label = "Bank Statement (PDF/Image)",
+            icon = Icons.Rounded.Description,
+            selectedUri = uiState.bankStatementUri,
+            onPick = { bankLauncher.launch("*/*") }
+        )
+
+        Text("Salary Slips (Up to 3)", style = MaterialTheme.typography.bodyMedium)
+        uiState.salarySlips.forEachIndexed { index, uri ->
+            DocumentPicker(
+                label = "Salary Slip ${index + 1}",
+                icon = Icons.Rounded.Payments,
+                selectedUri = uri,
+                onPick = { /* Can't re-pick individually easily in this simple UI, but could remove and re-add */ },
+                onRemove = { viewModel.removeSalarySlip(index) }
+            )
+        }
+
+        if (uiState.salarySlips.size < 3) {
+            OutlinedButton(
+                onClick = { salaryLauncher.launch("image/*") },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Rounded.Add, null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Add Salary Slip")
+            }
+        }
+    }
+}
+
+@Composable
+fun DocumentPicker(
+    label: String,
+    icon: ImageVector,
+    selectedUri: Uri?,
+    onPick: () -> Unit,
+    onRemove: (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .clickable(onClick = onPick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = if (selectedUri != null) "File selected" else "Tap to upload",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (selectedUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+            )
+        }
+        if (selectedUri != null) {
+            Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+            if (onRemove != null) {
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Rounded.Close, null, tint = MaterialTheme.colorScheme.error)
+                }
+            }
+        } else {
+            Icon(Icons.Rounded.FileUpload, null, tint = MaterialTheme.colorScheme.outline)
+        }
     }
 }
 

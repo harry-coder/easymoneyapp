@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -18,7 +19,10 @@ import com.tech.easymoney.ui.theme.EasyMoneyTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onApplyNowClick: () -> Unit = {}) {
+fun HomeScreen(
+    onApplyNowClick: () -> Unit = {},
+    onLogout: () -> Unit = {}
+) {
     Scaffold(
         topBar = {
             LargeTopAppBar(
@@ -33,6 +37,11 @@ fun HomeScreen(onApplyNowClick: () -> Unit = {}) {
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.secondary
                         )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = "Logout")
                     }
                 }
             )

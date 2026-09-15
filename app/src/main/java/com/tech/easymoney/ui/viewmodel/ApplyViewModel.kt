@@ -1,7 +1,9 @@
 package com.tech.easymoney.ui.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.storage.FirebaseStorage
 import com.tech.easymoney.data.model.ContactInfo
 import com.tech.easymoney.data.model.LoanApplicationRequest
 import com.tech.easymoney.data.network.ApiService
@@ -10,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 enum class ApplyStep {
     PERSONAL,
@@ -39,6 +42,10 @@ data class ApplyUiState(
     // KYC
     val panNumber: String = "",
     val aadhaarNumber: String = "",
+    // Documents
+    val panUri: Uri? = null,
+    val bankStatementUri: Uri? = null,
+    val salarySlips: List<Uri> = emptyList(),
     // App State
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null
@@ -65,6 +72,15 @@ class ApplyViewModel : ViewModel() {
     fun updatePanNumber(value: String) = _uiState.update { it.copy(panNumber = value.uppercase()) }
     fun updateAadhaarNumber(value: String) = _uiState.update { it.copy(aadhaarNumber = value) }
 
+    fun updatePanUri(uri: Uri?) = _uiState.update { it.copy(panUri = uri) }
+    fun updateBankStatementUri(uri: Uri?) = _uiState.update { it.copy(bankStatementUri = uri) }
+    fun addSalarySlip(uri: Uri) = _uiState.update { 
+        if (it.salarySlips.size < 3) it.copy(salarySlips = it.salarySlips + uri) else it 
+    }
+    fun removeSalarySlip(index: Int) = _uiState.update { 
+        it.copy(salarySlips = it.salarySlips.toMutableList().apply { removeAt(index) }) 
+    }
+
     fun nextStep(userLocation: String = "Unknown", contacts: List<ContactInfo> = emptyList()) {
         val currentState = _uiState.value
         when (currentState.currentStep) {
@@ -88,36 +104,62 @@ class ApplyViewModel : ViewModel() {
     }
 
     private fun submitApplication(userLocation: String, contacts: List<ContactInfo>) {
-        val s = _uiState.value
-        val request = LoanApplicationRequest(
-            employmentType = s.employmentType,
-            purposeOfLoan = s.purposeOfLoan,
-            loanAmount = s.loanAmount,
-            aadharNumber = s.aadhaarNumber,
-            panNumber = s.panNumber,
-            firstName = s.firstName,
-            lastName = s.lastName,
-            dob = s.dob,
-            maritalStatus = s.maritalStatus,
-            email = s.email,
-            mobileNumber = s.mobile,
-            presentAddress = s.presentAddress,
-            state = s.state,
-            city = s.city,
-            zipcode = s.zipcode,
-            monthlyIncome = s.monthlyIncome,
-            userLocation = userLocation,
-            contacts = contacts
-        )
-
         viewModelScope.launch {
-            _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
+            _uiState.update { it.copy(isSubmitting = true, errorMessage = "Uploading documents...") }
+            
+            val s = _uiState.value
+            val panRoot = s.panNumber.lowercase()
+            
+            // Upload Files
+            val panUrl = s.panUri?.let { uploadFile(it, "$panRoot/pan/pan.jpg") }
+            val bankUrl = s.bankStatementUri?.let { uploadFile(it, "$panRoot/bank/statement.pdf") }
+            val slip1 = s.salarySlips.getOrNull(0)?.let { uploadFile(it, "$panRoot/salary/slip1.jpg") }
+            val slip2 = s.salarySlips.getOrNull(1)?.let { uploadFile(it, "$panRoot/salary/slip2.jpg") }
+            val slip3 = s.salarySlips.getOrNull(2)?.let { uploadFile(it, "$panRoot/salary/slip3.jpg") }
+
+            val request = LoanApplicationRequest(
+                employmentType = s.employmentType,
+                purposeOfLoan = s.purposeOfLoan,
+                loanAmount = s.loanAmount,
+                aadharNumber = s.aadhaarNumber,
+                panNumber = s.panNumber,
+                firstName = s.firstName,
+                lastName = s.lastName,
+                dob = s.dob,
+                maritalStatus = s.maritalStatus,
+                email = s.email,
+                mobileNumber = s.mobile,
+                presentAddress = s.presentAddress,
+                state = s.state,
+                city = s.city,
+                zipcode = s.zipcode,
+                monthlyIncome = s.monthlyIncome,
+                userLocation = userLocation,
+                contacts = contacts,
+                panImageUrl = panUrl,
+                bankStatementUrl = bankUrl,
+                salarySlip1Url = slip1,
+                salarySlip2Url = slip2,
+                salarySlip3Url = slip3
+            )
+
+            _uiState.update { it.copy(errorMessage = "Submitting application...") }
             val success = ApiService.submitLoanApplication(request)
             if (success) {
                 _uiState.update { it.copy(currentStep = ApplyStep.SUCCESS, isSubmitting = false) }
             } else {
                 _uiState.update { it.copy(isSubmitting = false, errorMessage = "Submission failed. Please try again.") }
             }
+        }
+    }
+
+    private suspend fun uploadFile(uri: Uri, path: String): String? {
+        return try {
+            val storageRef = FirebaseStorage.getInstance().reference.child(path)
+            storageRef.putFile(uri).await()
+            storageRef.downloadUrl.await().toString()
+        } catch (e: Exception) {
+            null
         }
     }
 

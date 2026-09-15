@@ -23,9 +23,9 @@ val OnErrorLight = Color(0xFFFFFFFF)
 val ErrorContainerLight = Color(0xFFFFDAD6)
 val OnErrorContainerLight = Color(0xFF410002)
 
-val BackgroundLight = Color(0xFFF4FBFA)
+val BackgroundLight = Color(0xFFFFFFFF)
 val OnBackgroundLight = Color(0xFF161D1D)
-val SurfaceLight = Color(0xFFF4FBFA)
+val SurfaceLight = Color(0xFFFFFFFF)
 val OnSurfaceLight = Color(0xFF161D1D)
 
 // Dark Scheme

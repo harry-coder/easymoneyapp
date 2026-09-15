@@ -17,6 +17,15 @@ sealed interface Route : NavKey {
 
     @Serializable
     data object History : Route
+
+    @Serializable
+    data object Login : Route
+
+    @Serializable
+    data object Otp : Route
+
+    @Serializable
+    data object Onboarding : Route
 }
 
 enum class TopLevelDestination(

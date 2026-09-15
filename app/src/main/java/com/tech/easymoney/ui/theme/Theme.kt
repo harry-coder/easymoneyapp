@@ -59,9 +59,9 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun EasyMoneyTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false, // Force white theme
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false, // Disable dynamic color to keep brand colors consistent
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
