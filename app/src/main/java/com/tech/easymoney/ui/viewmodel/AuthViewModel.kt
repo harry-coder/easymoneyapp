@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tech.easymoney.data.model.OnboardingRequest
 import com.tech.easymoney.data.network.ApiService
 import com.tech.easymoney.utils.AuthPreferences
+import com.tech.easymoney.utils.LoggerUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -122,6 +123,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 OnboardingRequest(s.name, s.city, s.company, s.mobile)
             )
             if (success) {
+                LoggerUtils.logDebug("AuthViewModel", "Onboarding submitted successfully")
                 authPrefs.setOnboarded(true)
                 _uiState.update { it.copy(isLoading = false, step = AuthStep.AUTHENTICATED, isOnboarded = true) }
             } else {

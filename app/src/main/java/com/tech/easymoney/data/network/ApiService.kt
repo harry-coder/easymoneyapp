@@ -71,6 +71,7 @@ object ApiService {
                 contentType(ContentType.Application.Json)
                 setBody(jsonBody)
             }
+
             response.status.isSuccess()
         } catch (e: Exception) {
             Log.e("ApiService", "Error submitting onboarding", e)

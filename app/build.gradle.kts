@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.tech.easymoney"
+    namespace = "com.tech.easymoneys"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.tech.easymoney"
+        applicationId = "com.tech.easymoneys"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -91,7 +91,6 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.runner)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)

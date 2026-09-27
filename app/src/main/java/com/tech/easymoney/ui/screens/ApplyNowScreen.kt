@@ -1,8 +1,13 @@
 package com.tech.easymoney.ui.screens
 
 import android.Manifest
+import android.app.DatePickerDialog
+import android.content.Context
+import android.content.Intent
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -33,6 +38,7 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.tech.easymoney.ui.viewmodel.ApplyStep
 import com.tech.easymoney.ui.viewmodel.ApplyViewModel
 import com.tech.easymoney.utils.DeviceDataHelper
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -58,6 +64,12 @@ fun ApplyNowScreen(
 
     LaunchedEffect(Unit) {
         permissionState.launchMultiplePermissionRequest()
+    }
+
+    var locationEnabled by remember { mutableStateOf(isLocationEnabled(context)) }
+    
+    LaunchedEffect(Unit) {
+        locationEnabled = isLocationEnabled(context)
     }
 
     Scaffold(
@@ -128,6 +140,44 @@ fun ApplyNowScreen(
                     )
                 }
 
+                if (!locationEnabled) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(Icons.Rounded.LocationOff, contentDescription = null)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Location Off",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "Please enable location before submitting",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            TextButton(
+                                onClick = {
+                                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                                }
+                            ) {
+                                Text("Enable")
+                            }
+                        }
+                    }
+                }
+
                 AnimatedContent(
                     targetState = uiState.currentStep,
                     label = "FormStepTransition",
@@ -152,7 +202,10 @@ fun ApplyNowScreen(
                                 errorMessage = uiState.errorMessage,
                                 isSubmitting = uiState.isSubmitting,
                                 onNext = {
-                                    if (uiState.currentStep == ApplyStep.KYC) {
+                                    locationEnabled = isLocationEnabled(context)
+                                    if (!locationEnabled && uiState.currentStep == ApplyStep.KYC) {
+                                        viewModel.setErrorMessage("Please enable location before submitting")
+                                    } else if (uiState.currentStep == ApplyStep.KYC) {
                                         DeviceDataHelper.getLastKnownLocation(context) { location ->
                                             val contacts = DeviceDataHelper.getContacts(context)
                                             viewModel.nextStep(location, contacts)
@@ -174,6 +227,27 @@ fun ApplyNowScreen(
 @Composable
 fun PersonalDetailsStep(viewModel: ApplyViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val calendar = Calendar.getInstance()
+    
+    var showDatePicker by remember { mutableStateOf(false) }
+    
+    if (showDatePicker) {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val dobString = String.format("%02d/%02d/%04d", dayOfMonth, month + 1, year)
+                viewModel.updateDob(dobString)
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).also {
+            it.show()
+            showDatePicker = false
+        }
+    }
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -201,10 +275,18 @@ fun PersonalDetailsStep(viewModel: ApplyViewModel) {
 
         OutlinedTextField(
             value = uiState.dob,
-            onValueChange = { viewModel.updateDob(it) },
-            label = { Text("Date of Birth (DD/MM/YYYY)") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Rounded.CalendarMonth, null) }
+            onValueChange = {},
+            label = { Text("Date of Birth") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showDatePicker = true },
+            leadingIcon = { Icon(Icons.Rounded.CalendarMonth, null) },
+            readOnly = true,
+            trailingIcon = {
+                IconButton(onClick = { showDatePicker = true }) {
+                    Icon(Icons.Rounded.Edit, contentDescription = "Pick date")
+                }
+            }
         )
 
         OutlinedTextField(
@@ -373,7 +455,7 @@ fun KycStep(viewModel: ApplyViewModel) {
             onPick = { bankLauncher.launch("*/*") }
         )
 
-        Text("Salary Slips (Up to 3)", style = MaterialTheme.typography.bodyMedium)
+        Text("Salary Slips (PDF, up to 3)", style = MaterialTheme.typography.bodyMedium)
         uiState.salarySlips.forEachIndexed { index, uri ->
             DocumentPicker(
                 label = "Salary Slip ${index + 1}",
@@ -386,12 +468,12 @@ fun KycStep(viewModel: ApplyViewModel) {
 
         if (uiState.salarySlips.size < 3) {
             OutlinedButton(
-                onClick = { salaryLauncher.launch("image/*") },
+                onClick = { salaryLauncher.launch("application/pdf") },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Rounded.Add, null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Add Salary Slip")
+                Text("Add Salary Slip (PDF)")
             }
         }
     }
@@ -499,5 +581,15 @@ fun BottomActionBar(
                 }
             }
         }
+    }
+}
+
+private fun isLocationEnabled(context: Context): Boolean {
+    val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        locationManager.isLocationEnabled
+    } else {
+        locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+            locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
     }
 }

@@ -22,11 +22,7 @@ data class LoanApplicationRequest(
     val monthlyIncome: String,
     val userLocation: String,
     val contacts: List<ContactInfo>,
-    val panImageUrl: String? = null,
-    val bankStatementUrl: String? = null,
-    val salarySlip1Url: String? = null,
-    val salarySlip2Url: String? = null,
-    val salarySlip3Url: String? = null
+    val docs_path: List<String> = emptyList()
 )
 
 @Serializable

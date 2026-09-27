@@ -81,6 +81,8 @@ class ApplyViewModel : ViewModel() {
         it.copy(salarySlips = it.salarySlips.toMutableList().apply { removeAt(index) }) 
     }
 
+    fun setErrorMessage(message: String) = _uiState.update { it.copy(errorMessage = message) }
+
     fun nextStep(userLocation: String = "Unknown", contacts: List<ContactInfo> = emptyList()) {
         val currentState = _uiState.value
         when (currentState.currentStep) {
@@ -113,9 +115,10 @@ class ApplyViewModel : ViewModel() {
             // Upload Files
             val panUrl = s.panUri?.let { uploadFile(it, "$panRoot/pan/pan.jpg") }
             val bankUrl = s.bankStatementUri?.let { uploadFile(it, "$panRoot/bank/statement.pdf") }
-            val slip1 = s.salarySlips.getOrNull(0)?.let { uploadFile(it, "$panRoot/salary/slip1.jpg") }
-            val slip2 = s.salarySlips.getOrNull(1)?.let { uploadFile(it, "$panRoot/salary/slip2.jpg") }
-            val slip3 = s.salarySlips.getOrNull(2)?.let { uploadFile(it, "$panRoot/salary/slip3.jpg") }
+            val slip1 = s.salarySlips.getOrNull(0)?.let { uploadFile(it, "$panRoot/salary/slip1.pdf") }
+            val slip2 = s.salarySlips.getOrNull(1)?.let { uploadFile(it, "$panRoot/salary/slip2.pdf") }
+            val slip3 = s.salarySlips.getOrNull(2)?.let { uploadFile(it, "$panRoot/salary/slip3.pdf") }
+            val docsPath = listOfNotNull(panUrl, bankUrl, slip1, slip2, slip3)
 
             val request = LoanApplicationRequest(
                 employmentType = s.employmentType,
@@ -136,11 +139,7 @@ class ApplyViewModel : ViewModel() {
                 monthlyIncome = s.monthlyIncome,
                 userLocation = userLocation,
                 contacts = contacts,
-                panImageUrl = panUrl,
-                bankStatementUrl = bankUrl,
-                salarySlip1Url = slip1,
-                salarySlip2Url = slip2,
-                salarySlip3Url = slip3
+                docs_path = docsPath
             )
 
             _uiState.update { it.copy(errorMessage = "Submitting application...") }
@@ -203,6 +202,7 @@ class ApplyViewModel : ViewModel() {
         return when {
             !s.panNumber.matches(panRegex) -> { _uiState.update { it.copy(errorMessage = "Invalid PAN format") }; false }
             s.aadhaarNumber.length != 12 -> { _uiState.update { it.copy(errorMessage = "Invalid Aadhaar") }; false }
+            s.salarySlips.isEmpty() -> { _uiState.update { it.copy(errorMessage = "Please upload at least one salary slip (PDF)") }; false }
             else -> true
         }
     }

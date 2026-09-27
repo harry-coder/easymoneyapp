@@ -10,15 +10,17 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Phone
@@ -28,6 +30,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,8 +50,9 @@ import coil.compose.AsyncImage
 import com.tech.easymoney.ui.viewmodel.AuthViewModel
 
 @Composable
-fun LoginScreen(viewModel: AuthViewModel) {
+fun LoginScreen(viewModel: AuthViewModel,modifier: Modifier= Modifier) {
     val uiState by viewModel.uiState.collectAsState()
+    val scrollState = rememberScrollState()
     val pageGradient = Brush.verticalGradient(
         colors = listOf(
             Color(0xFFF6F7FF),
@@ -63,153 +67,164 @@ fun LoginScreen(viewModel: AuthViewModel) {
         )
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(pageGradient)
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(horizontal = 10.dp, vertical = 0.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Surface(
-            modifier = Modifier.widthIn(max = 440.dp),
-            shape = RoundedCornerShape(12.dp),
-            color = Color.White.copy(alpha = 0.92f),
-            shadowElevation = 14.dp,
-            tonalElevation = 2.dp
+    Scaffold(
+        modifier = modifier.windowInsetsPadding(WindowInsets.systemBars)
+    ) { innerPadding ->
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(pageGradient)
+                .padding(start = 10.dp, end = 10.dp)
         ) {
-            Column(
+            Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = Color.White.copy(alpha = 0.92f),
+                shadowElevation = 14.dp,
+                tonalElevation = 2.dp
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 24.dp, vertical = 28.dp)
+                        .imePadding(),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(accentGradient),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = "₹",
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(accentGradient),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "₹",
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "EasyMoney",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Text(
+                                text = "Quick access to your financial journey",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
-                    Column {
+                    AsyncImage(
+                        model = "https://easymoneys.in/wp-content/uploads/2025/07/image__3_-removebg-preview.png",
+                        contentDescription = "EasyMoney Logo",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp),
+                        contentScale = ContentScale.Fit
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "EasyMoney",
-                            style = MaterialTheme.typography.titleLarge,
+                            text = "Welcome back",
+                            style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Text(
-                            text = "Quick access to your financial journey",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "Sign in with your mobile number and we’ll send a secure OTP instantly.",
+                            style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
 
-                AsyncImage(
-                    model = "https://easymoneys.in/wp-content/uploads/2025/07/image__3_-removebg-preview.png",
-                    contentDescription = "EasyMoney Logo",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
-                    contentScale = ContentScale.Fit
-                )
-
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Welcome back",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    Text(
-                        text = "Sign in with your mobile number and we’ll send a secure OTP instantly.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(28.dp),
-                    color = Color.White,
-                    tonalElevation = 1.dp,
-                    shadowElevation = 8.dp
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    Surface(
+                        shape = RoundedCornerShape(28.dp),
+                        color = Color.White,
+                        tonalElevation = 1.dp,
+                        shadowElevation = 8.dp
                     ) {
-                        Text(
-                            text = "Mobile number",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        OutlinedTextField(
-                            value = uiState.mobile,
-                            onValueChange = { if (it.length <= 10) viewModel.updateMobile(it.filter(Char::isDigit)) },
-                            label = { Text("Enter 10-digit number") },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            leadingIcon = { Icon(Icons.Rounded.Phone, null) },
-                            prefix = { Text("+91 ") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(18.dp)
-                        )
-
-                        if (uiState.errorMessage != null) {
-                            Text(
-                                text = uiState.errorMessage!!,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-
-                        Button(
-                            onClick = { viewModel.sendOtp() },
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(56.dp),
-                            enabled = !uiState.isLoading && uiState.mobile.length == 10,
-                            shape = RoundedCornerShape(18.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            )
+                                .padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            if (uiState.isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    strokeWidth = 2.dp
+                            Text(
+                                text = "Mobile number",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+
+                            OutlinedTextField(
+                                value = uiState.mobile,
+                                onValueChange = {
+                                    if (it.length <= 10) viewModel.updateMobile(
+                                        it.filter(
+                                            Char::isDigit
+                                        )
+                                    )
+                                },
+                                label = { Text("Enter 10-digit number") },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                leadingIcon = { Icon(Icons.Rounded.Phone, null) },
+                                prefix = { Text("+91 ") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(18.dp)
+                            )
+
+                            if (uiState.errorMessage != null) {
+                                Text(
+                                    text = uiState.errorMessage!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
                                 )
-                            } else {
-                                Text("Send OTP", fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(Icons.AutoMirrored.Rounded.ArrowForward, null)
+                            }
+
+                            Button(
+                                onClick = { viewModel.sendOtp() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                enabled = !uiState.isLoading && uiState.mobile.length == 10,
+                                shape = RoundedCornerShape(18.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                if (uiState.isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text("Send OTP", fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Icon(Icons.AutoMirrored.Rounded.ArrowForward, null)
+                                }
                             }
                         }
                     }
-                }
 
-                Text(
-                    text = "Fast approvals, secure access, and a cleaner way to manage your loan applications.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                    Text(
+                        text = "Fast approvals, secure access, and a cleaner way to manage your loan applications.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }
