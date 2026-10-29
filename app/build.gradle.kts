@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.google.devtools.ksp)
     alias(libs.plugins.jetbrains.kotlin.plugin.serialization)
     alias(libs.plugins.google.gms.google.services)
+    alias(libs.plugins.google.firebase.crashlytics)
 }
 
 android {
@@ -14,17 +15,35 @@ android {
         applicationId = "com.tech.easymoneys"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    signingConfigs {
+        create("release") {
+            storeFile = file("/Users/harpreet.singh/Desktop/easy_money_jks/easy_money.jks") // e.g., file("../my-release-key.jks")
+            storePassword = "1234567890"
+            keyAlias = "easy_money"
+            keyPassword = "1234567890"
+        }
     }
 
     buildTypes {
         release {
-            optimization {
-                enable = false
+            getByName("release") {
+                // Enables R8 code shrinking, obfuscation, and optimization
+                isMinifyEnabled = true
+
+                // Optional: Enables resource shrinking (highly recommended alongside R8)
+                isShrinkResources = true
+
+                proguardFiles(
+                    getDefaultProguardFile("proguard-android-optimize.txt"),
+                    "../proguard-rules.pro"
+                )
             }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
@@ -47,6 +66,7 @@ dependencies {
     implementation(libs.androidx.compose.adaptive)
     implementation(libs.androidx.compose.adaptive.layout)
     implementation(libs.androidx.compose.adaptive.navigation3)
+    implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.storage)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.nav.suite)

@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "647038009438",
-    "project_id": "easymoney-befac",
-    "storage_bucket": "easymoney-befac.firebasestorage.app"
+    "project_number": "797530936206",
+    "project_id": "easymoneys-4eb9e",
+    "storage_bucket": "easymoneys-4eb9e.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:647038009438:android:86f02b564043b24cde34cf",
+        "mobilesdk_app_id": "1:797530936206:android:fe1b944fe78f01e979cadf",
         "android_client_info": {
           "package_name": "com.tech.easymoneys"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBmg-S9FLPLCywUl6cOpdx3ZYuWhtDEw1k"
+          "current_key": "AIzaSyC8e3wBSZtxQIM4XyhUGhp4izXv2sgD4s8"
         }
       ],
       "services": {
