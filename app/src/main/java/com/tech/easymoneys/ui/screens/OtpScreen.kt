@@ -1,16 +1,21 @@
 package com.tech.easymoneys.ui.screens
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -47,14 +52,9 @@ fun OtpScreen(viewModel: AuthViewModel) {
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
 
-                OutlinedTextField(
-                    value = uiState.otp,
-                    onValueChange = { if (it.length <= 4) viewModel.updateOtp(it) },
-                    label = { Text("Enter OTP") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    leadingIcon = { Icon(Icons.Rounded.Lock, null) },
-                    singleLine = true
+                OtpInput(
+                    otp = uiState.otp,
+                    onOtpChange = viewModel::updateOtp
                 )
 
                 if (uiState.errorMessage != null) {
@@ -90,4 +90,51 @@ fun OtpScreen(viewModel: AuthViewModel) {
             }
         }
     }
+}
+
+@Composable
+private fun OtpInput(
+    otp: String,
+    onOtpChange: (String) -> Unit,
+    length: Int = 4
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    // A single hidden text field drives all boxes, so paste, backspace and SMS autofill keep working
+    BasicTextField(
+        value = otp,
+        onValueChange = { input ->
+            val digits = input.filter { it.isDigit() }.take(length)
+            onOtpChange(digits)
+        },
+        modifier = Modifier.focusRequester(focusRequester),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+        singleLine = true,
+        decorationBox = {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                repeat(length) { index ->
+                    val char = otp.getOrNull(index)?.toString() ?: ""
+                    val isActive = index == otp.length || (index == length - 1 && otp.length == length)
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .border(
+                                width = if (isActive) 2.dp else 1.dp,
+                                color = if (isActive) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outline,
+                                shape = MaterialTheme.shapes.medium
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = char,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    )
 }

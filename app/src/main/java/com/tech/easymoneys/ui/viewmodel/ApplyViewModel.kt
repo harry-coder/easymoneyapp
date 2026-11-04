@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.storage.FirebaseStorage
 //import com.google.firebase.storage.FirebaseStorage
-import com.tech.easymoneys.data.model.ContactInfo
 import com.tech.easymoneys.data.model.LoanApplicationRequest
 import com.tech.easymoneys.data.network.ApiService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -84,7 +83,7 @@ class ApplyViewModel : ViewModel() {
 
     fun setErrorMessage(message: String) = _uiState.update { it.copy(errorMessage = message) }
 
-    fun nextStep(userLocation: String = "Unknown", contacts: List<ContactInfo> = emptyList()) {
+    fun nextStep(userLocation: String = "Unknown") {
         val currentState = _uiState.value
         when (currentState.currentStep) {
             ApplyStep.PERSONAL -> {
@@ -99,14 +98,14 @@ class ApplyViewModel : ViewModel() {
             }
             ApplyStep.KYC -> {
                 if (validateKyc()) {
-                    submitApplication(userLocation, contacts)
+                    submitApplication(userLocation)
                 }
             }
             ApplyStep.SUCCESS -> {}
         }
     }
 
-    private fun submitApplication(userLocation: String, contacts: List<ContactInfo>) {
+    private fun submitApplication(userLocation: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmitting = true, errorMessage = "Uploading documents...") }
             
@@ -139,7 +138,6 @@ class ApplyViewModel : ViewModel() {
                 zipcode = s.zipcode,
                 monthlyIncome = s.monthlyIncome,
                 userLocation = userLocation,
-                contacts = contacts,
                 docs_path = docsPath
             )
 

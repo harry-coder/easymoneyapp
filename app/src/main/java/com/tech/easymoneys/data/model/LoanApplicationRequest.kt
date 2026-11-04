@@ -21,12 +21,5 @@ data class LoanApplicationRequest(
     val zipcode: String,
     val monthlyIncome: String,
     val userLocation: String,
-    val contacts: List<ContactInfo>,
     val docs_path: List<String> = emptyList()
-)
-
-@Serializable
-data class ContactInfo(
-    val name: String,
-    val contact: String
 )

@@ -3,6 +3,7 @@ package com.tech.easymoneys.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tech.easymoneys.data.model.HistoryItem
+import com.tech.easymoneys.data.model.LoanHistoryItem
 import com.tech.easymoneys.data.network.ApiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,7 +12,7 @@ import kotlinx.coroutines.launch
 
 data class HistoryUiState(
     val pan: String = "",
-    val items: List<HistoryItem> = emptyList(),
+    val items: LoanHistoryItem = LoanHistoryItem(),
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -34,8 +35,8 @@ class HistoryViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             val results = ApiService.fetchHistoryByPan(pan)
-            if (results.isEmpty()) {
-                _uiState.update { it.copy(isLoading = false, error = "No records found for this PAN", items = emptyList()) }
+            if (results.data.isEmpty()) {
+                _uiState.update { it.copy(isLoading = false, error = "No records found for this PAN", items = LoanHistoryItem()) }
             } else {
                 _uiState.update { it.copy(isLoading = false, items = results, error = null) }
             }

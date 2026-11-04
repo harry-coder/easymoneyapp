@@ -3,10 +3,7 @@ package com.tech.easymoneys.utils
 import android.text.TextUtils
 import android.util.Log
 
-/**
- * Variant: debug
- * Full logging enabled, gated by FCConstants.IS_DISPLAY_LOGS.
- */
+
 object LoggerUtils {
 
     @JvmStatic
