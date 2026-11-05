@@ -2,6 +2,7 @@ package com.tech.easymoneys.data.network
 
 import android.util.Log
 import com.tech.easymoneys.data.model.*
+import com.tech.easymoneys.utils.LoggerUtils
 import io.ktor.client.*
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.*
@@ -78,17 +79,19 @@ object ApiService {
         }
     }
 
-    suspend fun fetchHistoryByPan(pan: String): List<HistoryItem> {
+    suspend fun fetchHistoryByPan(pan: String): LoanHistoryItem {
         return try {
-            val response = client.get("$BASE_URL/api/v1/user-info-by-pan") {
-                parameter("pan", pan)
+            val jsonBody = Json.encodeToString(PanRequest(pan))
+            val response = client.post("$BASE_URL/api/v1/user-info-by-pan") {
+                contentType(ContentType.Application.Json)
+                setBody(jsonBody)
             }
             if (response.status.isSuccess()) {
-                response.body<List<HistoryItem>>()
-            } else emptyList()
+                response.body<LoanHistoryItem>()
+            } else LoanHistoryItem()
         } catch (e: Exception) {
-            Log.e("ApiService", "Error fetching history", e)
-            emptyList()
+            LoggerUtils.logErr("ApiService", "Error fetching history", e)
+            LoanHistoryItem()
         }
     }
 

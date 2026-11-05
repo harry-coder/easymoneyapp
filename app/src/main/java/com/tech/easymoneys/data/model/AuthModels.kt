@@ -33,6 +33,11 @@ data class OnboardingRequest(
 )
 
 @Serializable
+data class PanRequest(
+    val pan: String
+)
+
+@Serializable
 data class HistoryItem(
     val pan: String,
     val name: String,

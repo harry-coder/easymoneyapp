@@ -13,6 +13,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,9 +30,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -253,35 +258,36 @@ fun PersonalDetailsStep(viewModel: ApplyViewModel) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Text("Personal Information", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        StepHeader("Personal Information", "Tell us a little about yourself")
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.firstName,
             onValueChange = { viewModel.updateFirstName(it) },
-            label = { Text("First Name") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Rounded.Person, null) }
+            label = "First Name",
+            placeholder = "e.g. Rahul",
+            leadingIcon = Icons.Rounded.Person,
+            capitalization = KeyboardCapitalization.Words
         )
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.lastName,
             onValueChange = { viewModel.updateLastName(it) },
-            label = { Text("Last Name") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Rounded.Person, null) }
+            label = "Last Name",
+            placeholder = "e.g. Sharma",
+            leadingIcon = Icons.Rounded.Person,
+            capitalization = KeyboardCapitalization.Words
         )
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.dob,
             onValueChange = {},
-            label = { Text("Date of Birth") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showDatePicker = true },
-            leadingIcon = { Icon(Icons.Rounded.CalendarMonth, null) },
+            label = "Date of Birth",
+            placeholder = "DD/MM/YYYY",
+            leadingIcon = Icons.Rounded.CalendarMonth,
             readOnly = true,
+            onClick = { showDatePicker = true },
             trailingIcon = {
                 IconButton(onClick = { showDatePicker = true }) {
                     Icon(Icons.Rounded.Edit, contentDescription = "Pick date")
@@ -289,63 +295,70 @@ fun PersonalDetailsStep(viewModel: ApplyViewModel) {
             }
         )
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.maritalStatus,
             onValueChange = { viewModel.updateMaritalStatus(it) },
-            label = { Text("Marital Status") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Rounded.Group, null) }
+            label = "Marital Status",
+            placeholder = "Single / Married",
+            leadingIcon = Icons.Rounded.Group,
+            capitalization = KeyboardCapitalization.Words
         )
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.mobile,
             onValueChange = { viewModel.updateMobile(it) },
-            label = { Text("Mobile Number") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            leadingIcon = { Icon(Icons.Rounded.Phone, null) }
+            label = "Mobile Number",
+            placeholder = "10-digit number",
+            leadingIcon = Icons.Rounded.Phone,
+            prefix = "+91 ",
+            keyboardType = KeyboardType.Phone
         )
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.email,
             onValueChange = { viewModel.updateEmail(it) },
-            label = { Text("Email Address") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            leadingIcon = { Icon(Icons.Rounded.Email, null) }
+            label = "Email Address",
+            placeholder = "name@example.com",
+            leadingIcon = Icons.Rounded.Email,
+            keyboardType = KeyboardType.Email
         )
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.presentAddress,
             onValueChange = { viewModel.updatePresentAddress(it) },
-            label = { Text("Present Address") },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 2,
-            leadingIcon = { Icon(Icons.Rounded.Home, null) }
+            label = "Present Address",
+            placeholder = "House no., street, area",
+            leadingIcon = Icons.Rounded.Home,
+            capitalization = KeyboardCapitalization.Sentences,
+            minLines = 2
         )
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            FormTextField(
                 value = uiState.city,
                 onValueChange = { viewModel.updateCity(it) },
-                label = { Text("City") },
+                label = "City",
+                placeholder = "City",
+                capitalization = KeyboardCapitalization.Words,
                 modifier = Modifier.weight(1f)
             )
-            OutlinedTextField(
+            FormTextField(
                 value = uiState.state,
                 onValueChange = { viewModel.updateState(it) },
-                label = { Text("State") },
+                label = "State",
+                placeholder = "State",
+                capitalization = KeyboardCapitalization.Words,
                 modifier = Modifier.weight(1f)
             )
         }
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.zipcode,
             onValueChange = { viewModel.updateZipcode(it) },
-            label = { Text("Zipcode") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            leadingIcon = { Icon(Icons.Rounded.Pin, null) }
+            label = "Zipcode",
+            placeholder = "6-digit PIN code",
+            leadingIcon = Icons.Rounded.Pin,
+            keyboardType = KeyboardType.Number
         )
     }
 }
@@ -358,42 +371,46 @@ fun LoanDetailsStep(viewModel: ApplyViewModel) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Text("Loan & Employment Details", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        StepHeader("Loan & Employment Details", "Help us find the right loan for you")
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.employmentType,
             onValueChange = { viewModel.updateEmploymentType(it) },
-            label = { Text("Employment Type") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Rounded.Work, null) }
+            label = "Employment Type",
+            placeholder = "Salaried / Self-employed",
+            leadingIcon = Icons.Rounded.Work,
+            capitalization = KeyboardCapitalization.Words
         )
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.monthlyIncome,
             onValueChange = { viewModel.updateMonthlyIncome(it) },
-            label = { Text("Monthly Income") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            leadingIcon = { Icon(Icons.Rounded.Payments, null) }
+            label = "Monthly Income",
+            placeholder = "0",
+            leadingIcon = Icons.Rounded.Payments,
+            prefix = "₹ ",
+            keyboardType = KeyboardType.Number
         )
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.purposeOfLoan,
             onValueChange = { viewModel.updatePurposeOfLoan(it) },
-            label = { Text("Purpose of Loan") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Rounded.QuestionMark, null) }
+            label = "Purpose of Loan",
+            placeholder = "e.g. Education, Medical",
+            leadingIcon = Icons.Rounded.QuestionMark,
+            capitalization = KeyboardCapitalization.Sentences
         )
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.loanAmount,
             onValueChange = { viewModel.updateLoanAmount(it) },
-            label = { Text("Loan Amount") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            leadingIcon = { Icon(Icons.Rounded.CurrencyRupee, null) }
+            label = "Loan Amount",
+            placeholder = "0",
+            leadingIcon = Icons.Rounded.CurrencyRupee,
+            prefix = "₹ ",
+            keyboardType = KeyboardType.Number
         )
     }
 }
@@ -419,23 +436,24 @@ fun KycStep(viewModel: ApplyViewModel) {
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("KYC Verification", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        StepHeader("KYC Verification", "Your details are encrypted and kept secure")
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.panNumber,
             onValueChange = { viewModel.updatePanNumber(it) },
-            label = { Text("PAN Number") },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(Icons.Rounded.Badge, null) }
+            label = "PAN Number",
+            placeholder = "ABCDE1234F",
+            leadingIcon = Icons.Rounded.Badge,
+            capitalization = KeyboardCapitalization.Characters
         )
 
-        OutlinedTextField(
+        FormTextField(
             value = uiState.aadhaarNumber,
             onValueChange = { viewModel.updateAadhaarNumber(it) },
-            label = { Text("Aadhaar Number") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            leadingIcon = { Icon(Icons.Rounded.Fingerprint, null) }
+            label = "Aadhaar Number",
+            placeholder = "12-digit number",
+            leadingIcon = Icons.Rounded.Fingerprint,
+            keyboardType = KeyboardType.Number
         )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -476,6 +494,88 @@ fun KycStep(viewModel: ApplyViewModel) {
                 Text("Add Salary Slip (PDF)")
             }
         }
+    }
+}
+
+@Composable
+private fun StepHeader(title: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun FormTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    leadingIcon: ImageVector? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    prefix: String? = null,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    capitalization: KeyboardCapitalization = KeyboardCapitalization.None,
+    readOnly: Boolean = false,
+    minLines: Int = 1,
+    onClick: (() -> Unit)? = null
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    // Text fields swallow click modifiers, so read-only fields like DOB listen for presses instead
+    if (onClick != null) {
+        LaunchedEffect(interactionSource) {
+            interactionSource.interactions.collect {
+                if (it is PressInteraction.Release) onClick()
+            }
+        }
+    }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+        )
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = placeholder?.let { { Text(it) } },
+            leadingIcon = leadingIcon?.let {
+                {
+                    Icon(
+                        it,
+                        contentDescription = null,
+                        tint = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            trailingIcon = trailingIcon,
+            prefix = prefix?.let { { Text(it) } },
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType, capitalization = capitalization),
+            readOnly = readOnly,
+            singleLine = minLines == 1,
+            minLines = minLines,
+            shape = RoundedCornerShape(16.dp),
+            interactionSource = interactionSource,
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedContainerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f),
+                focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                unfocusedBorderColor = Color.Transparent,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedPlaceholderColor = MaterialTheme.colorScheme.outline,
+                focusedPlaceholderColor = MaterialTheme.colorScheme.outline
+            )
+        )
     }
 }
 
