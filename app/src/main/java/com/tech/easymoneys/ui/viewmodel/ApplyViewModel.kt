@@ -1,16 +1,21 @@
 package com.tech.easymoneys.ui.viewmodel
 
+import android.app.Application
 import android.net.Uri
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.storage.FirebaseStorage
-//import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageException
+import com.google.firebase.storage.storageMetadata
 import com.tech.easymoneys.data.model.ContactInfo
 import com.tech.easymoneys.data.model.LoanApplicationRequest
 import com.tech.easymoneys.data.network.ApiService
+import com.tech.easymoneys.utils.AuthPreferences
+import com.tech.easymoneys.utils.LoggerUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -52,15 +57,29 @@ data class ApplyUiState(
     val errorMessage: String? = null
 )
 
-class ApplyViewModel : ViewModel() {
+class ApplyViewModel(application: Application) : AndroidViewModel(application) {
+    private companion object {
+        const val TAG = "ApplyViewModel"
+    }
+
+    private val authPrefs = AuthPreferences(application)
     private val _uiState = MutableStateFlow(ApplyUiState())
     val uiState: StateFlow<ApplyUiState> = _uiState.asStateFlow()
+
+    // Mobile number saved at login; the form shows it pre-filled and read-only
+    private var loggedInMobile: String = ""
+
+    init {
+        viewModelScope.launch {
+            loggedInMobile = authPrefs.userMobile.first().orEmpty()
+            _uiState.update { it.copy(mobile = loggedInMobile) }
+        }
+    }
 
     fun updateFirstName(value: String) = _uiState.update { it.copy(firstName = value) }
     fun updateLastName(value: String) = _uiState.update { it.copy(lastName = value) }
     fun updateDob(value: String) = _uiState.update { it.copy(dob = value) }
     fun updateMaritalStatus(value: String) = _uiState.update { it.copy(maritalStatus = value) }
-    fun updateMobile(value: String) = _uiState.update { it.copy(mobile = value) }
     fun updateEmail(value: String) = _uiState.update { it.copy(email = value) }
     fun updatePresentAddress(value: String) = _uiState.update { it.copy(presentAddress = value) }
     fun updateState(value: String) = _uiState.update { it.copy(state = value) }
@@ -113,13 +132,29 @@ class ApplyViewModel : ViewModel() {
             val s = _uiState.value
             val panRoot = s.panNumber.lowercase()
             
-            // Upload Files
-            val panUrl = s.panUri?.let { uploadFile(it, "$panRoot/pan/pan.jpg") }
-            val bankUrl = s.bankStatementUri?.let { uploadFile(it, "$panRoot/bank/statement.pdf") }
-            val slip1 = s.salarySlips.getOrNull(0)?.let { uploadFile(it, "$panRoot/salary/slip1.pdf") }
-            val slip2 = s.salarySlips.getOrNull(1)?.let { uploadFile(it, "$panRoot/salary/slip2.pdf") }
-            val slip3 = s.salarySlips.getOrNull(2)?.let { uploadFile(it, "$panRoot/salary/slip3.pdf") }
-            val docsPath = listOfNotNull(panUrl, bankUrl, slip1, slip2, slip3)
+            // Upload every selected document; stop if any of them fails so the
+            // application is never submitted with documents silently missing
+            val uploads = buildList {
+                s.panUri?.let { add(Triple(it, "$panRoot/pan/pan.pdf", "PAN card")) }
+                s.bankStatementUri?.let { add(Triple(it, "$panRoot/bank/statement.pdf", "Bank statement")) }
+                s.salarySlips.forEachIndexed { i, uri ->
+                    add(Triple(uri, "$panRoot/salary/slip${i + 1}.pdf", "Salary slip ${i + 1}"))
+                }
+            }
+            val docsPath = mutableListOf<String>()
+            for ((index, upload) in uploads.withIndex()) {
+                val (uri, path, name) = upload
+                _uiState.update { it.copy(errorMessage = "Uploading $name (${index + 1}/${uploads.size})...") }
+                try {
+                    docsPath += uploadFile(uri, path)
+                } catch (e: Exception) {
+                    LoggerUtils.logErr(TAG, "Upload failed for $path", e)
+                    _uiState.update {
+                        it.copy(isSubmitting = false, errorMessage = "Couldn't upload $name: ${uploadErrorMessage(e)}")
+                    }
+                    return@launch
+                }
+            }
 
             val request = LoanApplicationRequest(
                 employmentType = s.employmentType,
@@ -153,16 +188,21 @@ class ApplyViewModel : ViewModel() {
         }
     }
 
-    private suspend fun uploadFile(uri: Uri, path: String): String? {
-        return try {
-            val storageRef = FirebaseStorage.getInstance().reference.child(path)
-            storageRef.putFile(uri).await()
-            storageRef.downloadUrl.await().toString()
-        } catch (e: Exception) {
-            null
-        }
-
+    /** Uploads [uri] to Firebase Storage at [path] and returns its download URL; throws on failure. */
+    private suspend fun uploadFile(uri: Uri, path: String): String {
+        val storageRef = FirebaseStorage.getInstance().reference.child(path)
+        storageRef.putFile(uri, storageMetadata { contentType = "application/pdf" }).await()
+        return storageRef.downloadUrl.await().toString()
     }
+
+    private fun uploadErrorMessage(e: Exception): String =
+        when ((e as? StorageException)?.errorCode) {
+            StorageException.ERROR_NOT_AUTHENTICATED,
+            StorageException.ERROR_NOT_AUTHORIZED -> "storage permission denied. Please contact support."
+            StorageException.ERROR_RETRY_LIMIT_EXCEEDED -> "network problem. Please check your connection and try again."
+            StorageException.ERROR_QUOTA_EXCEEDED -> "storage quota exceeded."
+            else -> e.message ?: "unknown error"
+        }
 
     fun previousStep() {
         _uiState.update { state ->
@@ -210,6 +250,6 @@ class ApplyViewModel : ViewModel() {
     }
 
     fun reset() {
-        _uiState.value = ApplyUiState()
+        _uiState.value = ApplyUiState(mobile = loggedInMobile)
     }
 }

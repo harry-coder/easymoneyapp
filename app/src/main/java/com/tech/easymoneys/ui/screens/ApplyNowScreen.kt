@@ -126,10 +126,15 @@ fun ApplyNowScreen(
                 }
             }
         } else {
+            val scrollState = rememberScrollState()
+            LaunchedEffect(uiState.currentStep) { scrollState.scrollTo(0) }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
+                    .consumeWindowInsets(innerPadding)
+                    .imePadding()
             ) {
                 if (uiState.currentStep != ApplyStep.SUCCESS) {
                     LinearProgressIndicator(
@@ -145,82 +150,93 @@ fun ApplyNowScreen(
                     )
                 }
 
-                if (!locationEnabled) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
+                if (uiState.currentStep == ApplyStep.SUCCESS) {
+                    SuccessStep(onDone)
+                } else {
+                    // Whole form (banner, fields and action button) scrolls together so the
+                    // focused field can always be brought above the keyboard
+                    Column(
                         modifier = Modifier
+                            .weight(1f)
                             .fillMaxWidth()
-                            .padding(12.dp),
-                        shape = RoundedCornerShape(12.dp)
+                            .verticalScroll(scrollState)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(Icons.Rounded.LocationOff, contentDescription = null)
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Location Off",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    "Please enable location before submitting",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            TextButton(
-                                onClick = {
-                                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                                }
+                        if (!locationEnabled) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.errorContainer,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("Enable")
-                            }
-                        }
-                    }
-                }
-
-                AnimatedContent(
-                    targetState = uiState.currentStep,
-                    label = "FormStepTransition",
-                    modifier = Modifier.weight(1f)
-                ) { step ->
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                        Box(modifier = Modifier.widthIn(max = 600.dp)) {
-                            when (step) {
-                                ApplyStep.PERSONAL -> PersonalDetailsStep(viewModel)
-                                ApplyStep.LOAN_DETAILS -> LoanDetailsStep(viewModel)
-                                ApplyStep.KYC -> KycStep(viewModel)
-                                ApplyStep.SUCCESS -> SuccessStep(onDone)
-                            }
-                        }
-                    }
-                }
-
-                if (uiState.currentStep != ApplyStep.SUCCESS) {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Box(modifier = Modifier.widthIn(max = 600.dp)) {
-                            BottomActionBar(
-                                errorMessage = uiState.errorMessage,
-                                isSubmitting = uiState.isSubmitting,
-                                onNext = {
-                                    locationEnabled = isLocationEnabled(context)
-                                    if (!locationEnabled && uiState.currentStep == ApplyStep.KYC) {
-                                        viewModel.setErrorMessage("Please enable location before submitting")
-                                    } else if (uiState.currentStep == ApplyStep.KYC) {
-                                        DeviceDataHelper.getLastKnownLocation(context) { location ->
-                                            val contacts = DeviceDataHelper.getContacts(context)
-                                            viewModel.nextStep(location, contacts)
-                                        }
-                                    } else {
-                                        viewModel.nextStep()
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(Icons.Rounded.LocationOff, contentDescription = null)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "Location Off",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            "Please enable location before submitting",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
                                     }
-                                },
-                                isLastStep = uiState.currentStep == ApplyStep.KYC
-                            )
+                                    TextButton(
+                                        onClick = {
+                                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                                        }
+                                    ) {
+                                        Text("Enable")
+                                    }
+                                }
+                            }
+                        }
+
+                        AnimatedContent(
+                            targetState = uiState.currentStep,
+                            label = "FormStepTransition",
+                            modifier = Modifier.fillMaxWidth()
+                        ) { step ->
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                                Box(modifier = Modifier.widthIn(max = 600.dp)) {
+                                    when (step) {
+                                        ApplyStep.PERSONAL -> PersonalDetailsStep(viewModel)
+                                        ApplyStep.LOAN_DETAILS -> LoanDetailsStep(viewModel)
+                                        ApplyStep.KYC -> KycStep(viewModel)
+                                        ApplyStep.SUCCESS -> Unit
+                                    }
+                                }
+                            }
+                        }
+
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Box(modifier = Modifier.widthIn(max = 600.dp)) {
+                                BottomActionBar(
+                                    errorMessage = uiState.errorMessage,
+                                    isSubmitting = uiState.isSubmitting,
+                                    onNext = {
+                                        locationEnabled = isLocationEnabled(context)
+                                        if (!locationEnabled && uiState.currentStep == ApplyStep.KYC) {
+                                            viewModel.setErrorMessage("Please enable location before submitting")
+                                        } else if (uiState.currentStep == ApplyStep.KYC) {
+                                            DeviceDataHelper.getLastKnownLocation(context) { location ->
+                                                val contacts = DeviceDataHelper.getContacts(context)
+                                                viewModel.nextStep(location, contacts)
+                                            }
+                                        } else {
+                                            viewModel.nextStep()
+                                        }
+                                    },
+                                    isLastStep = uiState.currentStep == ApplyStep.KYC
+                                )
+                            }
                         }
                     }
                 }
@@ -255,8 +271,7 @@ fun PersonalDetailsStep(viewModel: ApplyViewModel) {
     
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .fillMaxWidth()
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
@@ -306,12 +321,14 @@ fun PersonalDetailsStep(viewModel: ApplyViewModel) {
 
         FormTextField(
             value = uiState.mobile,
-            onValueChange = { viewModel.updateMobile(it) },
+            onValueChange = {},
             label = "Mobile Number",
             placeholder = "10-digit number",
             leadingIcon = Icons.Rounded.Phone,
             prefix = "+91 ",
-            keyboardType = KeyboardType.Phone
+            keyboardType = KeyboardType.Phone,
+            enabled = false,
+            trailingIcon = { Icon(Icons.Rounded.Lock, contentDescription = "Verified number, not editable") }
         )
 
         FormTextField(
@@ -363,25 +380,78 @@ fun PersonalDetailsStep(viewModel: ApplyViewModel) {
     }
 }
 
+private val EMPLOYMENT_TYPES = listOf("Salaried", "Business")
+private val LOAN_PURPOSES = listOf("Education", "Marriage", "Medical", "Holiday")
+
+/** Read-only field that opens a dropdown of [options]; styled like [FormTextField]. */
+@Composable
+fun FormDropdownField(
+    value: String,
+    options: List<String>,
+    onOptionSelected: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    leadingIcon: ImageVector? = null
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        FormTextField(
+            value = value,
+            onValueChange = {},
+            label = label,
+            placeholder = placeholder,
+            leadingIcon = leadingIcon,
+            readOnly = true,
+            onClick = { expanded = true },
+            trailingIcon = {
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = "Choose $label"
+                    )
+                }
+            }
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        onOptionSelected(option)
+                        expanded = false
+                    },
+                    trailingIcon = if (option == value) {
+                        { Icon(Icons.Rounded.Check, contentDescription = null) }
+                    } else null
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun LoanDetailsStep(viewModel: ApplyViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .fillMaxWidth()
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         StepHeader("Loan & Employment Details", "Help us find the right loan for you")
 
-        FormTextField(
+        FormDropdownField(
             value = uiState.employmentType,
-            onValueChange = { viewModel.updateEmploymentType(it) },
+            options = EMPLOYMENT_TYPES,
+            onOptionSelected = { viewModel.updateEmploymentType(it) },
             label = "Employment Type",
-            placeholder = "Salaried / Self-employed",
-            leadingIcon = Icons.Rounded.Work,
-            capitalization = KeyboardCapitalization.Words
+            placeholder = "Select employment type",
+            leadingIcon = Icons.Rounded.Work
         )
 
         FormTextField(
@@ -394,13 +464,13 @@ fun LoanDetailsStep(viewModel: ApplyViewModel) {
             keyboardType = KeyboardType.Number
         )
 
-        FormTextField(
+        FormDropdownField(
             value = uiState.purposeOfLoan,
-            onValueChange = { viewModel.updatePurposeOfLoan(it) },
+            options = LOAN_PURPOSES,
+            onOptionSelected = { viewModel.updatePurposeOfLoan(it) },
             label = "Purpose of Loan",
-            placeholder = "e.g. Education, Medical",
-            leadingIcon = Icons.Rounded.QuestionMark,
-            capitalization = KeyboardCapitalization.Sentences
+            placeholder = "Select purpose",
+            leadingIcon = Icons.Rounded.QuestionMark
         )
 
         FormTextField(
@@ -431,8 +501,7 @@ fun KycStep(viewModel: ApplyViewModel) {
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .fillMaxWidth()
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -522,6 +591,7 @@ fun FormTextField(
     keyboardType: KeyboardType = KeyboardType.Text,
     capitalization: KeyboardCapitalization = KeyboardCapitalization.None,
     readOnly: Boolean = false,
+    enabled: Boolean = true,
     minLines: Int = 1,
     onClick: (() -> Unit)? = null
 ) {
@@ -563,6 +633,7 @@ fun FormTextField(
             prefix = prefix?.let { { Text(it) } },
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType, capitalization = capitalization),
             readOnly = readOnly,
+            enabled = enabled,
             singleLine = minLines == 1,
             minLines = minLines,
             shape = RoundedCornerShape(16.dp),
@@ -572,6 +643,12 @@ fun FormTextField(
                 focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
                 unfocusedBorderColor = Color.Transparent,
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                disabledBorderColor = Color.Transparent,
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledPrefixColor = MaterialTheme.colorScheme.onSurface,
                 unfocusedPlaceholderColor = MaterialTheme.colorScheme.outline,
                 focusedPlaceholderColor = MaterialTheme.colorScheme.outline
             )
