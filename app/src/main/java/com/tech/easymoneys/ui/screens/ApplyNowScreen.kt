@@ -1,6 +1,7 @@
 package com.tech.easymoneys.ui.screens
 
 import android.Manifest
+import android.app.Activity
 import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
@@ -9,6 +10,8 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
@@ -37,13 +40,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.Priority
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.tech.easymoneys.ui.viewmodel.ApplyStep
 import com.tech.easymoneys.ui.viewmodel.ApplyViewModel
 import com.tech.easymoneys.utils.DeviceDataHelper
 import java.util.Calendar
+
+private const val CONTACTS_PERMISSION = Manifest.permission.READ_CONTACTS
+private const val MAX_PERMISSION_DENIALS = 3
+private const val PERMISSION_PREFS = "permission_prefs"
+private const val KEY_DENIAL_COUNT = "required_permission_denials"
+private val LOCATION_PERMISSIONS = listOf(
+    Manifest.permission.ACCESS_FINE_LOCATION,
+    Manifest.permission.ACCESS_COARSE_LOCATION
+)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -54,28 +73,181 @@ fun ApplyNowScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    val permissionsToRequest = mutableListOf(
-        Manifest.permission.READ_CONTACTS,
-        Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.ACCESS_COARSE_LOCATION,
-        Manifest.permission.READ_PHONE_STATE
-    ).apply {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            add(Manifest.permission.READ_PHONE_NUMBERS)
+    val permissionsToRequest = remember {
+        mutableListOf(
+            CONTACTS_PERMISSION,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.READ_PHONE_STATE
+        ).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                add(Manifest.permission.READ_PHONE_NUMBERS)
+            }
         }
     }
 
-    val permissionState = rememberMultiplePermissionsState(permissions = permissionsToRequest)
+    // How many times in a row the user has denied contacts/location. Persisted so the count
+    // survives leaving the screen or restarting the app; reset once both are granted.
+    val permissionPrefs = remember {
+        context.getSharedPreferences(PERMISSION_PREFS, Context.MODE_PRIVATE)
+    }
+    var denialCount by remember { mutableIntStateOf(permissionPrefs.getInt(KEY_DENIAL_COUNT, 0)) }
+    fun saveDenialCount(count: Int) {
+        denialCount = count
+        permissionPrefs.edit().putInt(KEY_DENIAL_COUNT, count).apply()
+    }
 
-    LaunchedEffect(Unit) {
-        permissionState.launchMultiplePermissionRequest()
+    var permissionResultReceived by remember { mutableStateOf(false) }
+    // User pressed Submit and we're walking them through permission / location prompts first
+    var pendingSubmit by remember { mutableStateOf(false) }
+    var continueSubmit by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
+
+    val permissionState = rememberMultiplePermissionsState(permissions = permissionsToRequest) { result ->
+        val granted = result[CONTACTS_PERMISSION] == true && LOCATION_PERMISSIONS.any { result[it] == true }
+        saveDenialCount(if (granted) 0 else denialCount + 1)
+        permissionResultReceived = true
+    }
+
+    fun isGranted(permission: String) =
+        permissionState.permissions.any { it.permission == permission && it.status.isGranted }
+
+    // Approximate location (coarse only) is accepted, since Android 12+ lets users pick it
+    fun hasRequiredPermissions() =
+        isGranted(CONTACTS_PERMISSION) && LOCATION_PERMISSIONS.any { isGranted(it) }
+
+    // After MAX_PERMISSION_DENIALS denials, stop asking and send the user to App Settings instead
+    fun deniedTooManyTimes() = denialCount >= MAX_PERMISSION_DENIALS
+
+    fun requestRequiredPermissions() {
+        if (deniedTooManyTimes()) showSettingsDialog = true
+        else permissionState.launchMultiplePermissionRequest()
     }
 
     var locationEnabled by remember { mutableStateOf(isLocationEnabled(context)) }
-    
-    LaunchedEffect(Unit) {
+
+    // Re-check when returning from system settings / quick settings
+    LifecycleResumeEffect(Unit) {
         locationEnabled = isLocationEnabled(context)
+        onPauseOrDispose { }
     }
+
+    val locationSettingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        locationEnabled = isLocationEnabled(context)
+        if (result.resultCode == Activity.RESULT_OK) {
+            locationEnabled = true
+            if (pendingSubmit) continueSubmit = true
+        } else if (pendingSubmit) {
+            pendingSubmit = false
+            viewModel.setErrorMessage("Please turn on location to submit your application")
+        }
+    }
+
+    fun promptEnableLocation() {
+        requestLocationServices(context, locationSettingsLauncher) {
+            locationEnabled = true
+            if (pendingSubmit) continueSubmit = true
+        }
+    }
+
+    fun attemptSubmit() {
+        pendingSubmit = true
+        when {
+            !hasRequiredPermissions() -> {
+                viewModel.setErrorMessage("Contacts and location permissions are required to submit")
+                if (deniedTooManyTimes()) {
+                    pendingSubmit = false
+                    showSettingsDialog = true
+                } else {
+                    permissionState.launchMultiplePermissionRequest()
+                }
+            }
+            !isLocationEnabled(context) -> {
+                locationEnabled = false
+                viewModel.setErrorMessage("Please turn on location to submit your application")
+                promptEnableLocation()
+            }
+            else -> {
+                pendingSubmit = false
+                DeviceDataHelper.getLastKnownLocation(context) { location ->
+                    val contacts = DeviceDataHelper.getContacts(context)
+                    viewModel.nextStep(location, contacts)
+                }
+            }
+        }
+    }
+
+    // Ask for permissions on entry; if already granted, ask to turn on location right away
+    LaunchedEffect(Unit) {
+        if (!hasRequiredPermissions()) {
+            requestRequiredPermissions()
+        } else if (!isLocationEnabled(context)) {
+            promptEnableLocation()
+        }
+    }
+
+    // User may grant them from App Settings; start counting afresh if they're revoked later
+    val requiredGrantedNow = hasRequiredPermissions()
+    LaunchedEffect(requiredGrantedNow) {
+        if (requiredGrantedNow && denialCount != 0) saveDenialCount(0)
+    }
+
+    LaunchedEffect(permissionResultReceived) {
+        if (!permissionResultReceived) return@LaunchedEffect
+        permissionResultReceived = false
+        when {
+            pendingSubmit && hasRequiredPermissions() -> attemptSubmit()
+            hasRequiredPermissions() && !isLocationEnabled(context) -> promptEnableLocation()
+            hasRequiredPermissions() -> Unit
+            else -> {
+                if (pendingSubmit) {
+                    pendingSubmit = false
+                    viewModel.setErrorMessage("Contacts and location permissions are required to submit")
+                }
+                if (deniedTooManyTimes()) showSettingsDialog = true
+            }
+        }
+    }
+
+    LaunchedEffect(continueSubmit) {
+        if (continueSubmit) {
+            continueSubmit = false
+            attemptSubmit()
+        }
+    }
+
+    if (showSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            icon = { Icon(Icons.Rounded.Security, contentDescription = null) },
+            title = { Text("Permissions Required") },
+            text = {
+                Text(
+                    "You have denied the Location and Contacts permissions $MAX_PERMISSION_DENIALS times. " +
+                        "They are required to process your loan application, so please allow them manually:\n\n" +
+                        "Settings → Apps → EasyMoney → Permissions → Allow Location and Contacts"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSettingsDialog = false
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null)
+                        )
+                    )
+                }) { Text("Open Settings") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSettingsDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    val requiredGranted = hasRequiredPermissions()
 
     Scaffold(
         topBar = {
@@ -91,158 +263,155 @@ fun ApplyNowScreen(
             )
         }
     ) { innerPadding ->
-        if (!permissionState.allPermissionsGranted) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(24.dp)
-                ) {
-                    Icon(
-                        Icons.Rounded.Security,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "Permissions Required",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "To process your loan application, we need access to your contacts, location, and phone details for verification.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.padding(vertical = 16.dp)
-                    )
-                    Button(onClick = { permissionState.launchMultiplePermissionRequest() }) {
-                        Text("Grant Permissions")
-                    }
-                }
+        val scrollState = rememberScrollState()
+        LaunchedEffect(uiState.currentStep) { scrollState.scrollTo(0) }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .imePadding()
+        ) {
+            if (uiState.currentStep != ApplyStep.SUCCESS) {
+                LinearProgressIndicator(
+                    progress = {
+                        when (uiState.currentStep) {
+                            ApplyStep.PERSONAL -> 0.33f
+                            ApplyStep.LOAN_DETAILS -> 0.66f
+                            ApplyStep.KYC -> 1f
+                            else -> 1f
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-        } else {
-            val scrollState = rememberScrollState()
-            LaunchedEffect(uiState.currentStep) { scrollState.scrollTo(0) }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .consumeWindowInsets(innerPadding)
-                    .imePadding()
-            ) {
-                if (uiState.currentStep != ApplyStep.SUCCESS) {
-                    LinearProgressIndicator(
-                        progress = {
-                            when (uiState.currentStep) {
-                                ApplyStep.PERSONAL -> 0.33f
-                                ApplyStep.LOAN_DETAILS -> 0.66f
-                                ApplyStep.KYC -> 1f
-                                else -> 1f
-                            }
-                        },
+            if (uiState.currentStep == ApplyStep.SUCCESS) {
+                SuccessStep(onDone)
+            } else {
+                // Whole form (banner, fields and action button) scrolls together so the
+                // focused field can always be brought above the keyboard
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                ) {
+                    if (!requiredGranted) {
+                        WarningBanner(
+                            icon = Icons.Rounded.Security,
+                            title = "Permissions Required",
+                            message = "Allow contacts and location access to submit your application",
+                            actionLabel = "Allow",
+                            onAction = { requestRequiredPermissions() }
+                        )
+                    } else if (!locationEnabled) {
+                        WarningBanner(
+                            icon = Icons.Rounded.LocationOff,
+                            title = "Location Off",
+                            message = "Please turn on location before submitting",
+                            actionLabel = "Turn On",
+                            onAction = { promptEnableLocation() }
+                        )
+                    }
+
+                    AnimatedContent(
+                        targetState = uiState.currentStep,
+                        label = "FormStepTransition",
                         modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                if (uiState.currentStep == ApplyStep.SUCCESS) {
-                    SuccessStep(onDone)
-                } else {
-                    // Whole form (banner, fields and action button) scrolls together so the
-                    // focused field can always be brought above the keyboard
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .verticalScroll(scrollState)
-                    ) {
-                        if (!locationEnabled) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.errorContainer,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Icon(Icons.Rounded.LocationOff, contentDescription = null)
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            "Location Off",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            "Please enable location before submitting",
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    }
-                                    TextButton(
-                                        onClick = {
-                                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                                        }
-                                    ) {
-                                        Text("Enable")
-                                    }
-                                }
-                            }
-                        }
-
-                        AnimatedContent(
-                            targetState = uiState.currentStep,
-                            label = "FormStepTransition",
-                            modifier = Modifier.fillMaxWidth()
-                        ) { step ->
-                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-                                Box(modifier = Modifier.widthIn(max = 600.dp)) {
-                                    when (step) {
-                                        ApplyStep.PERSONAL -> PersonalDetailsStep(viewModel)
-                                        ApplyStep.LOAN_DETAILS -> LoanDetailsStep(viewModel)
-                                        ApplyStep.KYC -> KycStep(viewModel)
-                                        ApplyStep.SUCCESS -> Unit
-                                    }
-                                }
-                            }
-                        }
-
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    ) { step ->
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                             Box(modifier = Modifier.widthIn(max = 600.dp)) {
-                                BottomActionBar(
-                                    errorMessage = uiState.errorMessage,
-                                    isSubmitting = uiState.isSubmitting,
-                                    onNext = {
-                                        locationEnabled = isLocationEnabled(context)
-                                        if (!locationEnabled && uiState.currentStep == ApplyStep.KYC) {
-                                            viewModel.setErrorMessage("Please enable location before submitting")
-                                        } else if (uiState.currentStep == ApplyStep.KYC) {
-                                            DeviceDataHelper.getLastKnownLocation(context) { location ->
-                                                val contacts = DeviceDataHelper.getContacts(context)
-                                                viewModel.nextStep(location, contacts)
-                                            }
-                                        } else {
-                                            viewModel.nextStep()
-                                        }
-                                    },
-                                    isLastStep = uiState.currentStep == ApplyStep.KYC
-                                )
+                                when (step) {
+                                    ApplyStep.PERSONAL -> PersonalDetailsStep(viewModel)
+                                    ApplyStep.LOAN_DETAILS -> LoanDetailsStep(viewModel)
+                                    ApplyStep.KYC -> KycStep(viewModel)
+                                    ApplyStep.SUCCESS -> Unit
+                                }
                             }
+                        }
+                    }
+
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Box(modifier = Modifier.widthIn(max = 600.dp)) {
+                            BottomActionBar(
+                                errorMessage = uiState.errorMessage,
+                                isSubmitting = uiState.isSubmitting,
+                                onNext = {
+                                    if (uiState.currentStep == ApplyStep.KYC) {
+                                        attemptSubmit()
+                                    } else {
+                                        viewModel.nextStep()
+                                    }
+                                },
+                                isLastStep = uiState.currentStep == ApplyStep.KYC
+                            )
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun WarningBanner(
+    icon: ImageVector,
+    title: String,
+    message: String,
+    actionLabel: String,
+    onAction: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(12.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(icon, contentDescription = null)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                Text(message, style = MaterialTheme.typography.bodySmall)
+            }
+            TextButton(onClick = onAction) { Text(actionLabel) }
+        }
+    }
+}
+
+/**
+ * Shows Google Play services' in-app "Turn on location" dialog. Calls [onEnabled] if location is
+ * already on; falls back to the system location settings screen if the dialog can't be shown.
+ */
+private fun requestLocationServices(
+    context: Context,
+    launcher: ActivityResultLauncher<IntentSenderRequest>,
+    onEnabled: () -> Unit
+) {
+    val settingsRequest = LocationSettingsRequest.Builder()
+        .addLocationRequest(LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10_000L).build())
+        .setAlwaysShow(true)
+        .build()
+
+    LocationServices.getSettingsClient(context)
+        .checkLocationSettings(settingsRequest)
+        .addOnSuccessListener { onEnabled() }
+        .addOnFailureListener { e ->
+            val launched = e is ResolvableApiException && runCatching {
+                launcher.launch(IntentSenderRequest.Builder(e.resolution).build())
+            }.isSuccess
+            if (!launched) {
+                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            }
+        }
 }
 
 @Composable
